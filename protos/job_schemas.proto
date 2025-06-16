@@ -2,7 +2,25 @@ syntax = "proto2";
 
 package oracle_job;
 
-/// Represnts a list of tasks to be performed by a switchboard oracle.
+/// Represents a complete feed schema to be performed by a Switchboard oracle.
+message OracleFeed {
+  optional string name = 1;
+
+  /// A list of jobs to be performed by the oracle.
+  repeated OracleJob jobs = 2;
+
+  /// The number of oracles to sample before returning a result.
+  optional uint32 min_oracle_samples = 3;
+
+  /// The minimum number of jobs required to succeed in order to produce a result.
+  optional uint32 min_job_responses = 4;
+
+  /// Maximum allowed percentage deviation between job responses.
+  optional uint64 max_job_range_pct = 5;
+
+}
+
+/// Represnts a list of tasks to be performed by a Switchboard oracle.
 message OracleJob {
 /*
 The adapter will report the text body of a successful HTTP request to the
@@ -1563,20 +1581,67 @@ _**Example**_: Compute the median APY for an LST over the last 100 epochs
     enum Token2022Extension {
       TOKEN_2022_SCALED_AMOUNT_FACTOR = 0;
     }
+    /// The base58 encoded publicKey of the token mint address.
     optional string mint = 1;
     optional Token2022Extension extension = 2;
   }
 
   /*
-   * Mega-charged Switchboard feeds with direct streams to top exchanges
+   * Fetch a *live* spot price straight out of the global **Surge** websocket
+   * cache – the same cache that powers our high-speed on-chain oracles.
+   *
+   * _**Input**_
+   * • `symbol` – the trading-pair symbol as it appears on the exchange
+   * • `source` – which exchange’s stream to read from
+   *   • `BINANCE`   (weight 3)
+   *   • `BYBIT`     (weight 2)
+   *   • `OKX`       (weight 2)
+   *   • `COINBASE`  (weight 1)
+   *   • `WEIGHTED`  (default) – use the *weighted median* of all
+   *     fresh quotes (<= 5 s old) with the weights shown above.
+   *
+   * _**Returns**_
+   * The most recent price available from the chosen source.
+   * The task fails if the cached tick is older than **5 s**.
+   *
+   * _**Example**_: Pull the Binance price for BTC / USDT
+   * ```json
+   * {
+   *   "switchboardSurgeTask": {
+   *     "source": "BINANCE",
+   *     "symbol": "BTCUSDT"
+   *   }
+   * }
+   * ```
+   *
+   * _**Example**_: Use the weighted-median oracle for BTC / USDT
+   * ```json
+   * {
+   *   "switchboardSurgeTask": {
+   *     "source": "WEIGHTED",   // or omit — WEIGHTED is the default
+   *     "symbol": "BTCUSDT"
+   *   }
+   * }
+   * ```
+   *
+   * _**Notes**_
+   * • Symbols are auto-normalised (case-insensitive, punctuation removed).
+   * • If a venue’s price is stale (> 5 s) it is ignored in the WEIGHTED
+   *   calculation.  The task errors if **no** fresh price remains.
+   * • The weighted-median algorithm is the same one Hyperliquid uses in
+   *   production: cumulative weights 3 / 2 / 2 / 1 / 1 / 1 / 1 / 1 across the
+   *   eight venues (we currently stream the first four).
    */
-  message SurgeTask {
+  message SwitchboardSurgeTask {
     enum Source {
-      BINANCE = 0;
-      BYBIT = 1;
-      OKX = 2;
-      COINBASE = 3;
+      WEIGHTED  = 0;
+      BINANCE   = 1;
+      OKX       = 2;
+      BYBIT     = 3;
+      COINBASE  = 4;
     }
+    // Determines which source will be used for pricing.
+    // Default: WEIGHTED average across all sources.
     optional Source source = 1;
     optional string symbol = 2;
   }
@@ -1657,6 +1722,7 @@ _**Example**_: Compute the median APY for an LST over the last 100 epochs
       ExponentTask exponent_task = 67;
       ExponentPTLinearPricingTask exponent_pt_linear_pricing_task = 68;
       SolanaToken2022ExtensionTask solana_token_2022_extension_task = 69;
+      SwitchboardSurgeTask switchboard_surge_task = 70;
     }
   }
   /// The chain of tasks to perform for this OracleJob.
