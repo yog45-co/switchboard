@@ -747,6 +747,8 @@ _**Example**_: Fetch the JupiterSwap price for exchanging 1000 SOL into USDC.
     }
 
     optional Version version = 10;
+
+    optional bool direct_routes_only = 11;
   }
 
   /// Fetch the current price of a perpetual market.
@@ -1598,7 +1600,7 @@ _**Example**_: Compute the median APY for an LST over the last 100 epochs
    *   • `OKX`       (weight 2)
    *   • `COINBASE`  (weight 1)
    *   • `WEIGHTED`  (default) – use the *weighted median* of all
-   *     fresh quotes (<= 5 s old) with the weights shown above.
+   *     fresh quotes with the weights shown above.
    *
    * _**Returns**_
    * The most recent price available from the chosen source.
@@ -1609,7 +1611,7 @@ _**Example**_: Compute the median APY for an LST over the last 100 epochs
    * {
    *   "switchboardSurgeTask": {
    *     "source": "BINANCE",
-   *     "symbol": "BTCUSDT"
+   *     "symbol": "BTC/FDUSD"
    *   }
    * }
    * ```
@@ -1619,7 +1621,7 @@ _**Example**_: Compute the median APY for an LST over the last 100 epochs
    * {
    *   "switchboardSurgeTask": {
    *     "source": "WEIGHTED",   // or omit — WEIGHTED is the default
-   *     "symbol": "BTCUSDT"
+   *     "symbol": "BTC/USD"
    *   }
    * }
    * ```
